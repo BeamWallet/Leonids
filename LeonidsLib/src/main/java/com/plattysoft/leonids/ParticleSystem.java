@@ -1,6 +1,7 @@
 package com.plattysoft.leonids;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Timer;
@@ -21,6 +22,7 @@ import android.animation.Animator.AnimatorListener;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.AnimationDrawable;
@@ -79,7 +81,7 @@ public class ParticleSystem {
         public void run() {
             if(mPs.get() != null) {
                 ParticleSystem ps = mPs.get();
-                ps.onUpdate(ps.mCurrentTime);
+                ps.onUpdate(ps.mCurrentTime, true);
                 ps.mCurrentTime += TIMMERTASK_INTERVAL;
             }
         }
@@ -106,37 +108,49 @@ public class ParticleSystem {
 
 	/**
 	 * Creates a particle system with the given parameters
-	 *
 	 * @param parentView The parent view group
-	 * @param drawable The drawable to use as a particle
 	 * @param maxParticles The maximum number of particles
 	 * @param timeToLive The time to live for the particles
+	 * @param drawableResIds The list of drawables ids to use as particles
 	 */
-	public ParticleSystem(ViewGroup parentView, int maxParticles, Drawable drawable, long timeToLive) {
-		this(parentView, maxParticles, timeToLive);
+	public ParticleSystem(ViewGroup parentView, int maxParticles, long timeToLive, int... drawableResIds) {
+		this(parentView, maxParticles, timeToLive, loadDrawables(parentView.getContext(), drawableResIds));
+	}
 
-		if (drawable instanceof AnimationDrawable) {
-			AnimationDrawable animation = (AnimationDrawable) drawable;
-			for (int i=0; i<mMaxParticles; i++) {
-				mParticles.add (new AnimatedParticle (animation));
-			}
-		}
-		else {
-			Bitmap bitmap = null;
-			if (drawable instanceof BitmapDrawable) {
-				bitmap = ((BitmapDrawable) drawable).getBitmap();
-			}
-			else {
-				bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
+	/**
+	 * Creates a particle system with the given parameters
+	 * @param parentView The parent view group
+	 * @param maxParticles The maximum number of particles
+	 * @param timeToLive The time to live for the particles
+	 * @param drawables The list of drawables to use as particles
+	 */
+	public ParticleSystem(ViewGroup parentView, int maxParticles, long timeToLive, Drawable... drawables) {
+		this(parentView, maxParticles / drawables.length, timeToLive);
+
+		for (Drawable drawable : drawables) {
+			if (drawable instanceof AnimationDrawable) {
+				AnimationDrawable animation = (AnimationDrawable) drawable;
+				for (int i = 0; i < mMaxParticles; i++) {
+					mParticles.add(new AnimatedParticle(animation));
+				}
+			} else {
+				Bitmap bitmap = null;
+				if (drawable instanceof BitmapDrawable) {
+					bitmap = ((BitmapDrawable) drawable).getBitmap();
+				} else {
+					bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
 						drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-				Canvas canvas = new Canvas(bitmap);
-				drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-				drawable.draw(canvas);
-			}
-			for (int i=0; i<mMaxParticles; i++) {
-				mParticles.add (new Particle (bitmap));
+					Canvas canvas = new Canvas(bitmap);
+					drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+					drawable.draw(canvas);
+				}
+				for (int i = 0; i < mMaxParticles; i++) {
+					mParticles.add(new Particle(bitmap));
+				}
 			}
 		}
+
+		Collections.shuffle(mParticles);
 	}
 
 	/**
@@ -185,7 +199,7 @@ public class ParticleSystem {
      * @param parentViewId The view Id for the parent of the particle system
 	 */
 	public ParticleSystem(Activity a, int maxParticles, Drawable drawable, long timeToLive, int parentViewId) {
-		this((ViewGroup) a.findViewById(parentViewId), maxParticles, drawable, timeToLive);
+		this((ViewGroup) a.findViewById(parentViewId), maxParticles, timeToLive, drawable);
 	}
 
 	public float dpToPx(float dp) {
@@ -463,11 +477,13 @@ public class ParticleSystem {
 	 * @param emiter  View from which center the particles will be emited
 	 * @param gravity Which position among the view the emission takes place
 	 * @param particlesPerSecond Number of particles per second that will be emited (evenly distributed)
+	 * @return This.
 	 */
-	public void emitWithGravity (View emiter, int gravity, int particlesPerSecond) {
+	public ParticleSystem emitWithGravity (View emiter, int gravity, int particlesPerSecond) {
 		// Setup emiter
 		configureEmiter(emiter, gravity);
 		startEmiting(particlesPerSecond);
+		return this;
 	}
 	
 	private void startEmiting(int particlesPerSecond) {
@@ -475,7 +491,7 @@ public class ParticleSystem {
 		mParticlesPerMilisecond = particlesPerSecond/1000f;
 		// Add a full size view to the parent view		
 		mDrawingView = new ParticleField(mParentView.getContext());
-		mParentView.addView(mDrawingView);
+		mParentView.addView(mDrawingView, 0);
 		mEmitingTime = -1; // Meaning infinite
 		mDrawingView.setParticles (mActiveParticles);
 		updateParticlesBeforeStartTime(particlesPerSecond);
@@ -501,7 +517,7 @@ public class ParticleSystem {
 		mParticlesPerMilisecond = particlesPerSecond/1000f;
 		// Add a full size view to the parent view		
 		mDrawingView = new ParticleField(mParentView.getContext());
-		mParentView.addView(mDrawingView);
+		mParentView.addView(mDrawingView, 0);
 
 		mDrawingView.setParticles (mActiveParticles);
 		updateParticlesBeforeStartTime(particlesPerSecond);
@@ -550,7 +566,7 @@ public class ParticleSystem {
 		}
 		// Add a full size view to the parent view		
 		mDrawingView = new ParticleField(mParentView.getContext());
-		mParentView.addView(mDrawingView);
+		mParentView.addView(mDrawingView, 0);
 		mDrawingView.setParticles(mActiveParticles);
 		// We start a property animator that will call us to do the update
 		// Animate from 0 to timeToLiveMax
@@ -564,7 +580,7 @@ public class ParticleSystem {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
                 int miliseconds = (Integer) animation.getAnimatedValue();
-                onUpdate(miliseconds);
+                onUpdate(miliseconds, true);
             }
         });
 		mAnimator.addListener(new AnimatorListener() {			
@@ -663,14 +679,14 @@ public class ParticleSystem {
 		}
 	}
 
-	private void onUpdate(long miliseconds) {
-		while (((mEmitingTime > 0 && miliseconds < mEmitingTime)|| mEmitingTime == -1) && // This point should emit
-				!mParticles.isEmpty() && // We have particles in the pool 
-				mActivatedParticles < mParticlesPerMilisecond*miliseconds) { // and we are under the number of particles that should be launched
+	private void onUpdate(long miliseconds, boolean invalidate) {
+		while (((mEmitingTime > 0 && miliseconds < mEmitingTime) || mEmitingTime == -1) && // This point should emit
+			!mParticles.isEmpty() && // We have particles in the pool
+			mActivatedParticles < mParticlesPerMilisecond * miliseconds) { // and we are under the number of particles that should be launched
 			// Activate a new particle
-			activateParticle(miliseconds);			
+			activateParticle(miliseconds);
 		}
-		synchronized(mActiveParticles) {
+		synchronized (mActiveParticles) {
 			for (int i = 0; i < mActiveParticles.size(); i++) {
 				boolean active = mActiveParticles.get(i).update(miliseconds);
 				if (!active) {
@@ -680,7 +696,13 @@ public class ParticleSystem {
 				}
 			}
 		}
-		mDrawingView.postInvalidate();
+		if (invalidate) {
+			// There were a few cases when onUpdate is called and mDrawingView is null
+			// so this null check is added as a precaution
+			if (mDrawingView != null) {
+				mDrawingView.postInvalidateOnAnimation();
+			}
+		}
 	}
 
 	private void cleanupAnimation() {
@@ -718,14 +740,20 @@ public class ParticleSystem {
 		if (particlesPerSecond == 0) {
 			return;
 		}
-		long currentTimeInMs = mCurrentTime / 1000;
-		long framesCount = currentTimeInMs / particlesPerSecond;
-		if (framesCount == 0) {
+		if (mCurrentTime == 0) {
 			return;
 		}
-		long frameTimeInMs = mCurrentTime / framesCount;
-		for (int i = 1; i <= framesCount; i++) {
-			onUpdate(frameTimeInMs * i + 1);
+		for (int i = 0; i <= mCurrentTime; i += 100) {
+			onUpdate(i, false);
 		}
 	}
+
+	private static Drawable[] loadDrawables(Context context, int[] drawableResIds) {
+		Drawable[] drawables = new Drawable[drawableResIds.length];
+		for (int i = 0; i < drawableResIds.length; i++) {
+			drawables[i] = context.getResources().getDrawable(drawableResIds[i]);
+		}
+		return drawables;
+	}
+
 }
